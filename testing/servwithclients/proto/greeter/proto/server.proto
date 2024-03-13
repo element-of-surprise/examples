@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package greeter;
+
+option go_package = "github.com/element-of-surprise/examples/testing/servwithclients/proto/greeter/proto";
+
+service Greeter {
+  // Sends a greeting
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+  int32 age = 2;
+  Address address = 3;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  int32 zipcode = 4;
+}

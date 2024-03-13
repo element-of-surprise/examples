@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package service;
+
+import "github.com/element-of-surprise/examples/testing/servwithclients/proto/greeter/proto/server.proto";
+
+option go_package = "github.com/element-of-surprise/examples/testing/servwithclients/server/proto";
+
+service RPC {
+  rpc SayHello (greeter.HelloRequest) returns (greeter.HelloReply) {}
+  rpc CreateResourceGroup(CreateResourceGroupRequest) returns (CreateResourceGroupReply) {}
+  rpc ReadResourceGroup(ReadResourceGroupRequest) returns (ReadResourceGroupReply) {}
+  rpc UpdateResourceGroup(UpdateResourceGroupRequest) returns (UpdateResourceGroupReply) {}
+  rpc DeleteResourceGroup(DeleteResourceGroupRequest) returns (DeleteResourceGroupReply) {}
+  rpc ListResourceGroups(ListResourceGroupsRequest) returns (ListResourceGroupsReply) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;
+  int32 age = 2;
+  Address address = 3;
+}
+
+// The response message containing the greetings
+message HelloReply {
+  string message = 1;
+}
+
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  int32 zipcode = 4;
+}
+
+message CreateResourceGroupRequest{
+    string Name = 1;
+    string Region = 2;
+}
+
+message CreateResourceGroupReply{
+    string Status = 1;
+}
+
+message ReadResourceGroupRequest{
+    string Id = 1;
+}
+
+message ReadResourceGroupReply{
+    string Status = 1;
+}
+
+message UpdateResourceGroupRequest{
+    string Id = 1;
+    string Name = 2;
+    string Region = 3;
+}
+
+message UpdateResourceGroupReply{
+    string Status = 1;
+}
+
+message DeleteResourceGroupRequest{
+    string Id = 1;
+}
+
+message DeleteResourceGroupReply{
+    string Status = 1;
+}
+
+message ListResourceGroupsRequest{
+    string Name = 1;
+}
+
+message ListResourceGroupsReply{
+    repeated ResourceGroup resourceGroups = 1;
+}
+
+message ResourceGroup{
+    string Id = 1;
+    string Name = 2;
+    string Region = 3;
+}
