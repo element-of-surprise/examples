@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	azfake "github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/fake"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -85,28 +89,53 @@ func TestSayHello(t *testing.T) {
 	}
 }
 
+func mustFakeResourceGroupClient(calls *fakeResourceCalls) resourceClient {
+	fs := newResourceGroupsServer(calls)
+	client, err := armresources.NewResourceGroupsClient(
+		"subscriptionID",
+		&azfake.TokenCredential{},
+		&arm.ClientOptions{
+			ClientOptions: azcore.ClientOptions{
+				Transport: fake.NewResourceGroupsServerTransport(&fs),
+			},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
+
 func TestCreateResourceGroup(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		client  resourceClient
-		wantErr bool
+		name      string
+		fakeCalls *fakeResourceCalls
+		client    resourceClient
+		wantErr   bool
 	}{
 		{
-			name:    "Error: client returned an error",
-			client:  &fakeResourceClient{createOrUpdate: []any{errors.New("error")}},
-			wantErr: true,
+			name:      "Error: client returned an error",
+			fakeCalls: &fakeResourceCalls{createOrUpdate: []any{errors.New("error")}},
+			wantErr:   true,
 		},
 		{
-			name:   "Success",
-			client: &fakeResourceClient{createOrUpdate: []any{armresources.ResourceGroupsClientCreateOrUpdateResponse{}}},
+			name: "Success",
+			fakeCalls: &fakeResourceCalls{
+				createOrUpdate: []any{
+					armresources.ResourceGroupsClientCreateOrUpdateResponse{
+						ResourceGroup: armresources.ResourceGroup{ID: toPtr("id"), Name: toPtr("name"), Location: toPtr("westus")},
+					},
+				},
+			},
 		},
 	}
 
 	for _, test := range tests {
-		s := &Server{resourceClient: test.client}
-		_, err := s.CreateResourceGroup(context.Background(), &pb.CreateResourceGroupRequest{})
+		fakeClient := mustFakeResourceGroupClient(test.fakeCalls)
+		s := &Server{resourceClient: fakeClient}
+		_, err := s.CreateResourceGroup(context.Background(), &pb.CreateResourceGroupRequest{Name: "name"})
 		switch {
 		case err == nil && test.wantErr:
 			t.Errorf("TestCreateResourceGroup(%s): got err == nil, want err != nil", test.name)
@@ -116,4 +145,59 @@ func TestCreateResourceGroup(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestDeleteResourceGroup(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		fakeCalls *fakeResourceCalls
+		client    resourceClient
+		wantErr   bool
+	}{
+		{
+			name:      "Error: client returned an error",
+			fakeCalls: &fakeResourceCalls{beginDeleteErr: errors.New("error")},
+			wantErr:   true,
+		},
+		{
+			name: "Error: polling error",
+			fakeCalls: &fakeResourceCalls{
+				beginDelete: []any{
+					armresources.ResourceGroupsClientDeleteResponse{},
+					fmt.Errorf("error"),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Success",
+			fakeCalls: &fakeResourceCalls{
+				beginDelete: []any{
+					armresources.ResourceGroupsClientDeleteResponse{},
+					armresources.ResourceGroupsClientDeleteResponse{},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		fakeClient := mustFakeResourceGroupClient(test.fakeCalls)
+		s := &Server{resourceClient: fakeClient}
+		_, err := s.DeleteResourceGroup(context.Background(), &pb.DeleteResourceGroupRequest{Id: "id"})
+		switch {
+		case err == nil && test.wantErr:
+			t.Errorf("TestCreateResourceGroup(%s): got err == nil, want err != nil", test.name)
+			continue
+		case err != nil && !test.wantErr:
+			t.Errorf("TestCreateResourceGroup(%s): got err == %s, want err == nil", test.name, err)
+			continue
+		}
+	}
+}
+
+// toPtr will make any value of T become *T. If T is already a pointer, it will return a pointer to the pointer.
+func toPtr[T any](v T) *T {
+	return &v
 }

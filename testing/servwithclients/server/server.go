@@ -23,7 +23,7 @@ type resourceClient interface {
 	Update(ctx context.Context, resourceGroupName string, parameters armresources.ResourceGroupPatchable, options *armresources.ResourceGroupsClientUpdateOptions) (armresources.ResourceGroupsClientUpdateResponse, error)
 }
 
-// Server implements a gRPC server that acts as a proxy between for the greeter service and the Azure Resource Manager.
+// Server implements a gRPC server that acts as a proxy for the greeter service and the Azure Resource Manager.
 type Server struct {
 	pb.UnimplementedRPCServer
 
@@ -95,7 +95,12 @@ func (s *Server) UpdateResourceGroup(ctx context.Context, in *pb.UpdateResourceG
 }
 
 func (s *Server) DeleteResourceGroup(ctx context.Context, in *pb.DeleteResourceGroupRequest) (*pb.DeleteResourceGroupReply, error) {
-	_, err := s.resourceClient.BeginDelete(ctx, in.GetId(), nil)
+	poll, err := s.resourceClient.BeginDelete(ctx, in.GetId(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = poll.PollUntilDone(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
